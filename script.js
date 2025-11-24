@@ -4,6 +4,14 @@ let eventChart = null;
 let refreshInterval = null;
 let currentData = []; // Store the current data for filtering
 let currentPeriod = 'total'; // Default period
+let currentPage = 1; // Current page for pagination
+let rowsPerPage = 50; // Number of rows per page
+let currentRankingPeriod = 'total'; // Default period for ranking
+let searchFilters = {
+  player: '',
+  event: '',
+  server: ''
+};
 
 // Google Spreadsheet ID and API key
 const SPREADSHEET_ID = '1syWgN3zKEb8CDbeitotYNCG1NIILsJR1zzO5i4WjyVo';
@@ -47,25 +55,75 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   
-  // Add event listeners for ranking period buttons
-  const rankingButtons = document.querySelectorAll('.ranking-btn');
-  rankingButtons.forEach(button => {
+  // Set up search input event listeners
+  document.getElementById('player-search').addEventListener('input', handleSearch);
+  document.getElementById('event-search').addEventListener('input', handleSearch);
+  document.getElementById('server-search').addEventListener('input', handleSearch);
+  
+  // Add event listeners for period buttons in detailed registration
+  const detailedPeriodButtons = document.querySelectorAll('.detailed-container .period-btn');
+  detailedPeriodButtons.forEach(button => {
     button.addEventListener('click', function() {
-      // Remove active class from all buttons
-      rankingButtons.forEach(btn => btn.classList.remove('active'));
+      // Remove active class from all period buttons in detailed registration
+      detailedPeriodButtons.forEach(btn => btn.classList.remove('active'));
       // Add active class to clicked button
       this.classList.add('active');
       
       // Update the current period
       currentPeriod = this.getAttribute('data-period');
       
-      // Update the ranking display
+      // Reset to first page when changing periods
+      currentPage = 1;
+      
+      // Update the table display
       if (currentData.length > 0) {
-        populateDataTable(currentData);
+        populateDataTables(currentData);
+      }
+    });
+  });
+  
+  // Add event listeners for period buttons in ranking
+  const rankingPeriodButtons = document.querySelectorAll('.ranking-container .period-btn');
+  rankingPeriodButtons.forEach(button => {
+    button.addEventListener('click', function() {
+      // Remove active class from all period buttons in ranking
+      rankingPeriodButtons.forEach(btn => btn.classList.remove('active'));
+      // Add active class to clicked button
+      this.classList.add('active');
+      
+      // Update the current ranking period
+      currentRankingPeriod = this.getAttribute('data-period');
+      
+      // Update the ranking table display
+      if (currentData.length > 0) {
+        populateRankingTable(currentData);
       }
     });
   });
 });
+
+// Handle search input changes
+function handleSearch(event) {
+  const searchId = event.target.id;
+  const searchValue = event.target.value.toLowerCase();
+  
+  // Update the search filters
+  if (searchId === 'player-search') {
+    searchFilters.player = searchValue;
+  } else if (searchId === 'event-search') {
+    searchFilters.event = searchValue;
+  } else if (searchId === 'server-search') {
+    searchFilters.server = searchValue;
+  }
+  
+  // Reset to first page when search changes
+  currentPage = 1;
+  
+  // Update the detailed table display
+  if (currentData.length > 0) {
+    populateDetailedTable(currentData);
+  }
+}
 
 // Set up auto-refresh every 30 minutes
 function setupAutoRefresh() {
@@ -239,8 +297,8 @@ function processData(data) {
   // Create charts
   createCharts(data);
   
-  // Populate data table
-  populateDataTable(data);
+  // Populate data tables
+  populateDataTables(data);
   
   // Log the number of records being processed
   console.log(`Processing ${data.length} records`);
@@ -459,22 +517,136 @@ function createCharts(data) {
   });
 }
 
-// Populate data table
-function populateDataTable(data) {
-  console.log(`Populating data table with ${data.length} records for period: ${currentPeriod}`);
+// Populate data tables
+function populateDataTables(data) {
+  console.log(`Populating data tables with ${data.length} records for period: ${currentPeriod}`);
   
-  const tbody = document.querySelector('#dataTable tbody');
+  // Populate detailed registration table
+  populateDetailedTable(data);
+  
+  // Populate ranking table
+  populateRankingTable(data);
+}
+
+function populateDetailedTable(data) {
+  const tbody = document.querySelector('#detailedTable tbody');
   tbody.innerHTML = ''; // Clear existing data
   
   // Filter data based on the current period
-  const filteredData = filterDataByPeriod(data, currentPeriod);
+  let filteredData = filterDataByPeriod(data, currentPeriod);
+  
+  // Apply search filters
+  if (searchFilters.player) {
+    filteredData = filteredData.filter(item => 
+      item.player && item.player.toLowerCase().includes(searchFilters.player)
+    );
+  }
+  
+  if (searchFilters.event) {
+    filteredData = filteredData.filter(item => 
+      item.evento && item.evento.toLowerCase().includes(searchFilters.event)
+    );
+  }
+  
+  if (searchFilters.server) {
+    filteredData = filteredData.filter(item => 
+      item.servidor && item.servidor.toLowerCase().includes(searchFilters.server)
+    );
+  }
+  
+  // Sort by date and time (newest first)
+  filteredData.sort((a, b) => {
+    const dateA = parseDate(a.data);
+    const dateB = parseDate(b.data);
+    if (dateA && dateB) {
+      if (dateA.getTime() !== dateB.getTime()) {
+        return dateB.getTime() - dateA.getTime(); // Sort by date (newest first)
+      }
+      // If dates are equal, sort by time (newest first)
+      return b.hora.localeCompare(a.hora);
+    }
+    return 0;
+  });
+  
+  // Calculate pagination
+  const totalRecords = filteredData.length;
+  const totalPages = Math.ceil(totalRecords / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = Math.min(startIndex + rowsPerPage, totalRecords);
+  const pageData = filteredData.slice(startIndex, endIndex);
+  
+  // Display detailed records
+  pageData.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${item.data || ''}</td>
+      <td>${item.hora || ''}</td>
+      <td>${item.servidor || ''}</td>
+      <td>${item.player || ''}</td>
+      <td>${item.evento || ''}</td>
+      <td>${item.print ? `<a href="${item.print}" target="_blank">Link</a>` : ''}</td>
+      <td>${item.observacao || ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  
+  // Add pagination controls
+  if (totalPages > 1) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td colspan="7" style="text-align: center;">
+        <div class="pagination-controls">
+          <button class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''} data-page="${currentPage - 1}">Anterior</button>
+          <span>Página ${currentPage} de ${totalPages}</span>
+          <button class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} data-page="${currentPage + 1}">Próxima</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+    
+    // Add event listeners to pagination buttons
+    const paginationButtons = tbody.querySelectorAll('.pagination-btn');
+    paginationButtons.forEach(button => {
+      button.addEventListener('click', function() {
+        const newPage = parseInt(this.getAttribute('data-page'));
+        if (newPage && newPage !== currentPage) {
+          currentPage = newPage;
+          populateDetailedTable(currentData);
+        }
+      });
+    });
+  }
+  
+  console.log(`Detailed table populated with ${pageData.length} records (page ${currentPage} of ${totalPages})`);
+}
+
+function populateRankingTable(data) {
+  const tbody = document.querySelector('#rankingTable tbody');
+  tbody.innerHTML = ''; // Clear existing data
+  
+  // Filter data based on the current ranking period
+  const filteredData = filterDataByPeriod(data, currentRankingPeriod);
   
   // Count participations per player
   const playerCounts = {};
+  // Count unique events per player
+  const playerEvents = {};
+  
   filteredData.forEach(item => {
     const player = item.player || '';
+    const event = item.evento || '';
+    
     if (player) {
+      // Count participations
       playerCounts[player] = (playerCounts[player] || 0) + 1;
+      
+      // Count unique events
+      if (!playerEvents[player]) {
+        playerEvents[player] = new Set();
+      }
+      if (event) {
+        playerEvents[player].add(event);
+      }
     }
   });
   
@@ -482,28 +654,22 @@ function populateDataTable(data) {
   const sortedPlayers = Object.entries(playerCounts)
     .sort(([,a], [,b]) => b - a);
   
-  // Display sorted data
-  const displayData = sortedPlayers.slice(0, 100); // Limit to top 100 for performance
-  const skippedCount = sortedPlayers.length - displayData.length;
+  // Display sorted data (top 50)
+  const displayData = sortedPlayers.slice(0, 50); // Limit to top 50 for performance
   
   displayData.forEach(([player, count], index) => {
+    const uniqueEventsCount = playerEvents[player] ? playerEvents[player].size : 0;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${index + 1}</td>
       <td>${player}</td>
       <td>${count}</td>
-      <td colspan="4"></td>
+      <td>${uniqueEventsCount}</td>
     `;
     tbody.appendChild(tr);
   });
   
-  if (skippedCount > 0) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="7" style="text-align: center; font-style: italic;">... and ${skippedCount} more players</td>`;
-    tbody.appendChild(tr);
-  }
-  
-  console.log(`Data table populated with ${displayData.length} players for period: ${currentPeriod}`);
+  console.log(`Ranking table populated with ${displayData.length} players for period: ${currentRankingPeriod}`);
 }
 
 // Filter data by time period
@@ -531,27 +697,34 @@ function filterDataByPeriod(data, period) {
       });
       
     case 'weekly':
-      // Filter for current week
+      // Filter for current week (Sunday 00:00 to Saturday 23:59)
+      const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
       const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - now.getDay());
+      weekStart.setDate(now.getDate() - dayOfWeek); // Start from Sunday
+      weekStart.setHours(0, 0, 0, 0); // Set to 00:00:00
+      
       const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setDate(weekStart.getDate() + 6); // End on Saturday
+      weekEnd.setHours(23, 59, 59, 999); // Set to 23:59:59
       
       return data.filter(item => {
         const itemDate = parseDate(item.data);
-        return itemDate && itemDate >= weekStart && itemDate <= weekEnd;
+        const itemDateTime = itemDate ? new Date(itemDate.getFullYear(), itemDate.getMonth(), itemDate.getDate()) : null;
+        return itemDateTime && itemDateTime >= weekStart && itemDateTime <= weekEnd;
       });
       
     case 'daily':
-      // Filter for today
+      // Filter for today (00:00 to 23:59)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
       
       return data.filter(item => {
         const itemDate = parseDate(item.data);
-        return itemDate && itemDate >= today && itemDate < tomorrow;
+        const itemDateTime = itemDate ? new Date(itemDate.getFullYear(), itemDate.getMonth(), itemDate.getDate()) : null;
+        return itemDateTime && itemDateTime >= today && itemDateTime < tomorrow;
       });
       
     case 'total':
@@ -615,10 +788,13 @@ function filterData() {
   
   console.log(`Filtered data count: ${filteredData.length}`);
   
+  // Reset to first page when filters change
+  currentPage = 1;
+  
   // Update all dashboard elements with filtered data
   calculateKPIs(filteredData);
   createCharts(filteredData);
-  populateDataTable(filteredData);
+  populateDataTables(filteredData);
 }
 
 // Update the last refresh time display
