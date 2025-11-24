@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Presença UNF - Dashboard</title>
+    <link rel="icon" href="logo/logo.jpg" type="image/jpeg">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <img src="logo/logo.jpg" alt="UNF Logo" class="logo">
+                <div class="header-text">
+                    <h1>Controle de Presença Unforgiven</h1>
+                    <p class="subtitle">Dashboard de Monitoramento em Tempo Real</p>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- KPIs Section -->
+            <section class="kpis">
+                <div class="kpi-card animate-card">
+                    <div class="kpi-icon">📊</div>
+                    <h3>Total de Registros</h3>
+                    <div id="total-registros" class="kpi-value">0</div>
+                    <div class="kpi-trend">
+                        <span class="trend-up">↗</span>
+                        <span class="trend-text">+5% desde ontem</span>
+                    </div>
+                </div>
+                <div class="kpi-card animate-card">
+                    <div class="kpi-icon">👥</div>
+                    <h3>Total de Jogadores</h3>
+                    <div id="total-jogadores" class="kpi-value">0</div>
+                    <div class="kpi-trend">
+                        <span class="trend-up">↗</span>
+                        <span class="trend-text">+2 novos hoje</span>
+                    </div>
+                </div>
+                <div class="kpi-card animate-card">
+                    <div class="kpi-icon">🏆</div>
+                    <h3>Evento Mais Frequente</h3>
+                    <div id="evento-frequente" class="kpi-value">-</div>
+                    <div class="kpi-trend">
+                        <span class="trend-neutral">→</span>
+                        <span class="trend-text">Consistente</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Last Refresh Time -->
+            <div id="last-refresh" class="last-refresh">
+                Última atualização: Carregando...
+            </div>
+
+            <!-- Filters Section -->
+            <section class="filters animate-section">
+                <h2>_filtros interativos</h2>
+                <div class="filters-container">
+                    <div class="filter-group">
+                        <label for="date-filter">📅 Data:</label>
+                        <select id="date-filter">
+                            <option value="all">Todas as Datas</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="player-filter">👤 Jogador:</label>
+                        <select id="player-filter">
+                            <option value="all">Todos os Jogadores</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="event-filter">🎪 Evento:</label>
+                        <select id="event-filter">
+                            <option value="all">Todos os Eventos</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="server-filter">🖥️ Servidor:</label>
+                        <select id="server-filter">
+                            <option value="all">Todos os Servidores</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <button id="refresh-btn" class="refresh-button">
+                            <span class="refresh-icon">🔄</span>
+                            Atualizar Agora
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts Section -->
+            <section class="charts">
+                <div class="chart-container animate-section">
+                    <div class="chart-header">
+                        <h2>Ranking de Participação por Jogador</h2>
+                        <div class="chart-actions">
+                            <button class="chart-action-btn active">Top 10</button>
+                            <button class="chart-action-btn">Todos</button>
+                        </div>
+                    </div>
+                    <canvas id="playerChart"></canvas>
+                </div>
+
+                <div class="chart-container animate-section">
+                    <div class="chart-header">
+                        <h2>Frequência de Eventos</h2>
+                        <div class="chart-actions">
+                            <button class="chart-action-btn active">Distribuição</button>
+                        </div>
+                    </div>
+                    <canvas id="eventChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Data Table Section -->
+            <section class="data-table-section animate-section">
+                <div class="table-header">
+                    <h2>Registro Detalhado de Participações</h2>
+                    <div class="table-controls">
+                        <button class="table-control-btn active">📋 Tabela</button>
+                        <button class="table-control-btn">📊 Gráfico</button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>SERVIDOR</th>
+                                <th>USUÁRIO</th>
+                                <th>PLAYER</th>
+                                <th>EVENTO</th>
+                                <th>DATA</th>
+                                <th>HORA</th>
+                                <th>OBSERVAÇÃO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Dashboard de Controle de Presença UNF &copy; 2025</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
