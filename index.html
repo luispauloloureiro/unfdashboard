@@ -121,23 +121,20 @@
             <!-- Data Table Section -->
             <section class="data-table-section animate-section">
                 <div class="table-header">
-                    <h2>Registro Detalhado de Participações</h2>
-                    <div class="table-controls">
-                        <button class="table-control-btn active">📋 Tabela</button>
-                        <button class="table-control-btn">📊 Gráfico</button>
-                    </div>
+                    <h2 id="table-title">Ranking de Participações</h2>
+                </div>
+                <div class="ranking-controls">
+                    <button class="ranking-btn active" data-view="ranking">RANKING (Top 100)</button>
+                    <button class="ranking-btn" data-view="detailed">REGISTRO DETALHADO</button>
                 </div>
                 <div class="table-wrapper">
                     <table id="dataTable">
-                        <thead>
+                        <thead id="table-head">
                             <tr>
-                                <th>SERVIDOR</th>
-                                <th>USUÁRIO</th>
-                                <th>PLAYER</th>
-                                <th>EVENTO</th>
-                                <th>DATA</th>
-                                <th>HORA</th>
-                                <th>OBSERVAÇÃO</th>
+                                <th>Posição</th>
+                                <th>Player</th>
+                                <th>Participações</th>
+                                <th colspan="4">Detalhes</th>
                             </tr>
                         </thead>
                         <tbody>

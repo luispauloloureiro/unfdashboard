@@ -2,6 +2,8 @@
 let playerChart = null;
 let eventChart = null;
 let refreshInterval = null;
+let currentData = []; // Store the current data for filtering
+let currentPeriod = 'total'; // Default period
 
 // Google Spreadsheet ID and API key
 const SPREADSHEET_ID = '1syWgN3zKEb8CDbeitotYNCG1NIILsJR1zzO5i4WjyVo';
@@ -45,16 +47,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   
-  // Add hover effects to table control buttons
-  const tableControlButtons = document.querySelectorAll('.table-control-btn');
-  tableControlButtons.forEach(button => {
+  // Add event listeners for ranking period buttons
+  const rankingButtons = document.querySelectorAll('.ranking-btn');
+  rankingButtons.forEach(button => {
     button.addEventListener('click', function() {
-      // Remove active class from siblings
-      this.parentElement.querySelectorAll('.table-control-btn').forEach(btn => {
-        btn.classList.remove('active');
-      });
+      // Remove active class from all buttons
+      rankingButtons.forEach(btn => btn.classList.remove('active'));
       // Add active class to clicked button
       this.classList.add('active');
+      
+      // Update the current period
+      currentPeriod = this.getAttribute('data-period');
+      
+      // Update the ranking display
+      if (currentData.length > 0) {
+        populateDataTable(currentData);
+      }
     });
   });
 });
@@ -79,11 +87,13 @@ function setupAutoRefresh() {
 async function loadData() {
   try {
     console.log(`Buscando dados da aba "${SHEET_NAME}" em: ${DATA_URL}`);
+    console.log(`Spreadsheet ID: ${SPREADSHEET_ID}`);
 
     // Faz a requisição direta para o Google Sheets
     const response = await fetch(DATA_URL);
     
     console.log('Response status:', response.status);
+    console.log('Response headers:', [...response.headers.entries()]);
     
     if (!response.ok) {
       throw new Error(`Erro ao carregar dados do Google Sheets. Status: ${response.status}`);
@@ -91,6 +101,9 @@ async function loadData() {
 
     const csvText = await response.text();
     console.log('CSV text length:', csvText.length);
+    
+    // Log first 500 characters for debugging
+    console.log('First 500 chars of CSV:', csvText.substring(0, 500));
 
     // Verifica se o conteúdo parece ser uma planilha restrita
     if (csvText.includes(' precisa de permissão') || 
@@ -100,10 +113,22 @@ async function loadData() {
         (csvText.includes('<html') && csvText.includes('accounts.google.com'))) {
       throw new Error('Planilha restrita - é necessário configurar permissões públicas');
     }
+    
+    // Check if we got actual data or just headers
+    const rows = csvText.split('\n').filter(row => row.trim() !== '');
+    console.log('Total rows in CSV:', rows.length);
+    if (rows.length <= 1) {
+      console.warn('CSV contains only headers or is empty');
+    }
 
     // Converte o texto CSV em um array de objetos JSON que o dashboard entende
     const records = csvToArray(csvText);
     console.log('Records parsed:', records.length);
+    
+    // Check if we have actual data
+    if (records.length === 0) {
+      console.warn('No valid records found after parsing');
+    }
     
     // Process data and populate dashboard
     processData(records);
@@ -126,6 +151,7 @@ async function loadData() {
     }
     
     // Fallback to sample data if loading fails
+    console.log("Falling back to sample data");
     processData(sampleData);
   }
 }
@@ -194,6 +220,16 @@ const sampleData = [
 
 // Process data and populate all dashboard elements
 function processData(data) {
+  console.log(`Processing data with ${data.length} records`);
+  
+  // Store the current data for filtering
+  currentData = [...data];
+  
+  // Log first few records for debugging
+  if (data.length > 0) {
+    console.log('First 3 records:', data.slice(0, 3));
+  }
+  
   // Calculate KPIs
   calculateKPIs(data);
   
@@ -212,6 +248,8 @@ function processData(data) {
 
 // Calculate and display KPIs
 function calculateKPIs(data) {
+  console.log(`Calculating KPIs with ${data.length} records`);
+  
   // Total records
   document.getElementById('total-registros').textContent = data.length;
   
@@ -233,6 +271,8 @@ function calculateKPIs(data) {
   );
   
   document.getElementById('evento-frequente').textContent = mostFrequentEvent || '-';
+  
+  console.log(`KPIs calculated - Total: ${data.length}, Unique Players: ${uniquePlayers}, Most Frequent Event: ${mostFrequentEvent}`);
 }
 
 // Populate filter dropdowns
@@ -421,42 +461,164 @@ function createCharts(data) {
 
 // Populate data table
 function populateDataTable(data) {
-  console.log(`Populating data table with ${data.length} records`);
+  console.log(`Populating data table with ${data.length} records for period: ${currentPeriod}`);
   
   const tbody = document.querySelector('#dataTable tbody');
   tbody.innerHTML = ''; // Clear existing data
   
-  // Limit to first 1000 records for performance if there are too many
-  const displayData = data.length > 1000 ? data.slice(0, 1000) : data;
-  const skippedCount = data.length - displayData.length;
+  // Filter data based on the current period
+  const filteredData = filterDataByPeriod(data, currentPeriod);
   
-  displayData.forEach((row, index) => {
+  // Count participations per player
+  const playerCounts = {};
+  filteredData.forEach(item => {
+    const player = item.player || '';
+    if (player) {
+      playerCounts[player] = (playerCounts[player] || 0) + 1;
+    }
+  });
+  
+  // Sort players by participation count (descending)
+  const sortedPlayers = Object.entries(playerCounts)
+    .sort(([,a], [,b]) => b - a);
+  
+  // Display sorted data
+  const displayData = sortedPlayers.slice(0, 100); // Limit to top 100 for performance
+  const skippedCount = sortedPlayers.length - displayData.length;
+  
+  displayData.forEach(([player, count], index) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${row.servidor || ''}</td>
-      <td>${row.usuario || ''}</td>
-      <td>${row.player || ''}</td>
-      <td>${row.evento || ''}</td>
-      <td>${row.data || ''}</td>
-      <td>${row.hora || ''}</td>
-      <td>${row.observacao || ''}</td>
+      <td>${index + 1}</td>
+      <td>${player}</td>
+      <td>${count}</td>
+      <td colspan="4"></td>
     `;
     tbody.appendChild(tr);
   });
   
   if (skippedCount > 0) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="7" style="text-align: center; font-style: italic;">... and ${skippedCount} more records</td>`;
+    tr.innerHTML = `<td colspan="7" style="text-align: center; font-style: italic;">... and ${skippedCount} more players</td>`;
     tbody.appendChild(tr);
   }
   
-  console.log(`Data table populated with ${displayData.length} records`);
+  console.log(`Data table populated with ${displayData.length} players for period: ${currentPeriod}`);
+}
+
+// Filter data by time period
+function filterDataByPeriod(data, period) {
+  const now = new Date();
+  
+  switch (period) {
+    case 'annual':
+      // Filter for current year
+      const currentYear = now.getFullYear();
+      return data.filter(item => {
+        const itemDate = parseDate(item.data);
+        return itemDate && itemDate.getFullYear() === currentYear;
+      });
+      
+    case 'monthly':
+      // Filter for current month
+      const currentMonth = now.getMonth();
+      const currentYearMonth = now.getFullYear();
+      return data.filter(item => {
+        const itemDate = parseDate(item.data);
+        return itemDate && 
+               itemDate.getMonth() === currentMonth && 
+               itemDate.getFullYear() === currentYearMonth;
+      });
+      
+    case 'weekly':
+      // Filter for current week
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      
+      return data.filter(item => {
+        const itemDate = parseDate(item.data);
+        return itemDate && itemDate >= weekStart && itemDate <= weekEnd;
+      });
+      
+    case 'daily':
+      // Filter for today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      
+      return data.filter(item => {
+        const itemDate = parseDate(item.data);
+        return itemDate && itemDate >= today && itemDate < tomorrow;
+      });
+      
+    case 'total':
+    default:
+      // No filtering for total
+      return data;
+  }
+}
+
+// Parse date string (dd/mm/yyyy format)
+function parseDate(dateString) {
+  if (!dateString) return null;
+  
+  const parts = dateString.split('/');
+  if (parts.length !== 3) return null;
+  
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1; // Months are 0-indexed
+  const year = parseInt(parts[2], 10);
+  
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+  
+  return new Date(year, month, day);
 }
 
 // Filter data based on selected filters
 function filterData() {
-  // Load data again to ensure we're working with fresh data
-  loadData();
+  // Get selected filter values
+  const dateFilter = document.getElementById('date-filter').value;
+  const playerFilter = document.getElementById('player-filter').value;
+  const eventFilter = document.getElementById('event-filter').value;
+  const serverFilter = document.getElementById('server-filter').value;
+  
+  console.log('Filtering data with:', { dateFilter, playerFilter, eventFilter, serverFilter });
+  
+  // Start with all current data
+  let filteredData = [...currentData];
+  
+  // Apply date filter
+  if (dateFilter !== 'all') {
+    filteredData = filteredData.filter(item => item.data === dateFilter);
+  }
+  
+  // Apply player filter
+  if (playerFilter !== 'all') {
+    filteredData = filteredData.filter(item => item.player === playerFilter);
+  }
+  
+  // Apply event filter
+  if (eventFilter !== 'all') {
+    filteredData = filteredData.filter(item => item.evento === eventFilter);
+  }
+  
+  // Apply server filter
+  if (serverFilter !== 'all') {
+    filteredData = filteredData.filter(item => item.servidor === serverFilter);
+  }
+  
+  // Apply period filter
+  filteredData = filterDataByPeriod(filteredData, currentPeriod);
+  
+  console.log(`Filtered data count: ${filteredData.length}`);
+  
+  // Update all dashboard elements with filtered data
+  calculateKPIs(filteredData);
+  createCharts(filteredData);
+  populateDataTable(filteredData);
 }
 
 // Update the last refresh time display
